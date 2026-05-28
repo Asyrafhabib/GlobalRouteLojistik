@@ -9,8 +9,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Global Route Lojistik - Enterprise Logistics Portal v2.4")
-        self.resize(1150, 700)
         self.setStyleSheet(get_stylesheet())
+        
+        # Membuang Title Bar bawaan Windows
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
+        
+        # Menampilkan aplikasi secara penuh
+        self.showMaximized()
         
         self.is_sidebar_expanded = True
 
@@ -27,15 +32,16 @@ class MainWindow(QMainWindow):
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.logo = QLabel("GRL")
+        # PERBAIKAN: Mengganti teks "GRL" dengan gambar ikon logo SVG (55x55 px)
+        self.logo = QLabel()
         self.logo.setObjectName("logo")
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo.setPixmap(get_icon("logo").pixmap(QSize(55, 55)))
         
         self.logo_sub = QLabel("GLOBAL ROUTE LOJİSTİK")
         self.logo_sub.setObjectName("logo_sub")
         self.logo_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # KUNCI: Menahan space (ruang) walaupun widget disembunyikan (hide)
         sp = self.logo_sub.sizePolicy()
         sp.setRetainSizeWhenHidden(True)
         self.logo_sub.setSizePolicy(sp)
