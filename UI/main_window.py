@@ -50,18 +50,21 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.logo_sub)
 
         # Tombol Navigasi
+        self.btn_anamenu = QPushButton(" Ana Menu")
         self.btn_musteri = QPushButton(" Müşteriler")
         self.btn_gonderi = QPushButton(" Kargo Gönderimi")
         self.btn_sube = QPushButton(" Şubeler")
         self.btn_hareket = QPushButton(" Hareketler")
 
+        self.btn_anamenu.original_text = " Ana Menu"
         self.btn_musteri.original_text = " Müşteriler"
         self.btn_gonderi.original_text = " Kargo Gönderimi"
         self.btn_sube.original_text = " Şubeler"
         self.btn_hareket.original_text = " Hareketler"
 
-        self.nav_buttons = [self.btn_musteri, self.btn_gonderi, self.btn_sube, self.btn_hareket]
+        self.nav_buttons = [self.btn_anamenu, self.btn_musteri, self.btn_gonderi, self.btn_sube, self.btn_hareket]
         
+        self.btn_anamenu.setIcon(get_icon("dashboard"))
         self.btn_musteri.setIcon(get_icon("person"))
         self.btn_gonderi.setIcon(get_icon("shipping"))
         self.btn_sube.setIcon(get_icon("store"))
@@ -96,26 +99,31 @@ class MainWindow(QMainWindow):
         self.header_layout.addWidget(self.lbl_subtitle)
         content_layout.addWidget(self.header_frame)
 
+        from UI.pages import AnaMenuPage # <-- Pastikan kamu mengimpor AnaMenuPage di atas file main_window.py
+        
         self.stacked_widget = QStackedWidget()
-        self.stacked_widget.addWidget(MusteriPage())
-        self.stacked_widget.addWidget(GonderiPage())
-        self.stacked_widget.addWidget(SubePage())
-        self.stacked_widget.addWidget(HareketPage())
+        self.stacked_widget.addWidget(AnaMenuPage()) # Index 0
+        self.stacked_widget.addWidget(MusteriPage()) # Index 1
+        self.stacked_widget.addWidget(GonderiPage()) # Index 2
+        self.stacked_widget.addWidget(SubePage())    # Index 3
+        self.stacked_widget.addWidget(HareketPage()) # Index 4
         content_layout.addWidget(self.stacked_widget)
 
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(content_area)
 
-        # Logika Navigasi
-        self.btn_musteri.clicked.connect(lambda: self.handle_nav_click(0, "👥 Müşteriler Yönetimi", "Sistemdeki tüm müşteri kayıtlarını yönetin", self.btn_musteri))
-        self.btn_gonderi.clicked.connect(lambda: self.handle_nav_click(1, "📦 Kargo Gönderimi Yönetimi", "Tüm aktif kargo sevkiyatlarını yönetin", self.btn_gonderi))
-        self.btn_sube.clicked.connect(lambda: self.handle_nav_click(2, "🏢 Şubeler Yönetimi", "Şube ağını ve lokasyon bilgilerini yönetin", self.btn_sube))
-        self.btn_hareket.clicked.connect(lambda: self.handle_nav_click(3, "🔄 Hareketler Yönetimi", "Seçili kargonun taşıma geçmişini listeleyin", self.btn_hareket))
+        # Logika Navigasi (Geser Index-nya)
+        self.btn_anamenu.clicked.connect(lambda: self.handle_nav_click(0, "🏠 Ana Menu", "Sistem istatistikleri ve genel bakış", self.btn_anamenu))
+        self.btn_musteri.clicked.connect(lambda: self.handle_nav_click(1, "👥 Müşteriler Yönetimi", "Sistemdeki tüm müşteri kayıtlarını yönetin", self.btn_musteri))
+        self.btn_gonderi.clicked.connect(lambda: self.handle_nav_click(2, "📦 Kargo Gönderimi Yönetimi", "Tüm aktif kargo sevkiyatlarını yönetin", self.btn_gonderi))
+        self.btn_sube.clicked.connect(lambda: self.handle_nav_click(3, "🏢 Şubeler Yönetimi", "Şube ağını ve lokasyon bilgilerini yönetin", self.btn_sube))
+        self.btn_hareket.clicked.connect(lambda: self.handle_nav_click(4, "🔄 Hareketler Yönetimi", "Seçili kargonun taşıma geçmişini listeleyin", self.btn_hareket))
 
-        # Setup Awal
-        self.btn_gonderi.setChecked(True)
-        self.handle_nav_click(1, "📦 Kargo Gönderimi Yönetimi", "Tüm aktif kargo sevkiyatlarını yönetin", self.btn_gonderi, force_init=True)
+        # Setup Awal (Jadikan Ana Menu sebagai halaman default)
+        self.btn_anamenu.setChecked(True)
+        self.handle_nav_click(0, "🏠 Ana Menu", "Sistem istatistikleri ve genel bakış", self.btn_anamenu, force_init=True)
 
+  
     def handle_nav_click(self, index, title, subtitle, clicked_btn, force_init=False):
         if not force_init and self.stacked_widget.currentIndex() == index:
             self.toggle_sidebar()
