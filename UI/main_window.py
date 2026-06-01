@@ -16,6 +16,7 @@ class MainWindow(QMainWindow):
         
         # Menampilkan aplikasi secara penuh
         self.showMaximized()
+        self.setMinimumSize(1000, 700) # Mencegah tabel gepeng di layar kecil
         
         self.is_sidebar_expanded = True
 
@@ -32,7 +33,6 @@ class MainWindow(QMainWindow):
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         
-        # PERBAIKAN: Mengganti teks "GRL" dengan gambar ikon logo SVG (55x55 px)
         self.logo = QLabel()
         self.logo.setObjectName("logo")
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -49,14 +49,14 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.logo)
         sidebar_layout.addWidget(self.logo_sub)
 
-        # Tombol Navigasi
-        self.btn_anamenu = QPushButton(" Ana Menu")
+        # Tombol Navigasi (Sudah dikoreksi ke bahasa Turki baku)
+        self.btn_anamenu = QPushButton(" Ana Menü")
         self.btn_musteri = QPushButton(" Müşteriler")
         self.btn_gonderi = QPushButton(" Kargo Gönderimi")
         self.btn_sube = QPushButton(" Şubeler")
         self.btn_hareket = QPushButton(" Hareketler")
 
-        self.btn_anamenu.original_text = " Ana Menu"
+        self.btn_anamenu.original_text = " Ana Menü"
         self.btn_musteri.original_text = " Müşteriler"
         self.btn_gonderi.original_text = " Kargo Gönderimi"
         self.btn_sube.original_text = " Şubeler"
@@ -90,7 +90,8 @@ class MainWindow(QMainWindow):
         self.header_layout.setContentsMargins(0, 0, 0, 10)
         self.header_layout.setSpacing(0)
         
-        self.lbl_title = QLabel("📦 Kargo Gönderimi Yönetimi")
+        # PERBAIKAN: Menghapus emoji bawaan sistem pada judul default
+        self.lbl_title = QLabel("Kargo Gönderimi Yönetimi")
         self.lbl_title.setObjectName("header_title")
         self.lbl_subtitle = QLabel("Tüm aktif kargo sevkiyatlarını yönetin")
         self.lbl_subtitle.setObjectName("header_subtitle")
@@ -99,7 +100,7 @@ class MainWindow(QMainWindow):
         self.header_layout.addWidget(self.lbl_subtitle)
         content_layout.addWidget(self.header_frame)
 
-        from UI.pages import AnaMenuPage # <-- Pastikan kamu mengimpor AnaMenuPage di atas file main_window.py
+        from UI.pages import AnaMenuPage 
         
         self.stacked_widget = QStackedWidget()
         self.stacked_widget.addWidget(AnaMenuPage()) # Index 0
@@ -112,16 +113,16 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(content_area)
 
-        # Logika Navigasi (Geser Index-nya)
-        self.btn_anamenu.clicked.connect(lambda: self.handle_nav_click(0, "🏠 Ana Menu", "Sistem istatistikleri ve genel bakış", self.btn_anamenu))
-        self.btn_musteri.clicked.connect(lambda: self.handle_nav_click(1, "👥 Müşteriler Yönetimi", "Sistemdeki tüm müşteri kayıtlarını yönetin", self.btn_musteri))
-        self.btn_gonderi.clicked.connect(lambda: self.handle_nav_click(2, "📦 Kargo Gönderimi Yönetimi", "Tüm aktif kargo sevkiyatlarını yönetin", self.btn_gonderi))
-        self.btn_sube.clicked.connect(lambda: self.handle_nav_click(3, "🏢 Şubeler Yönetimi", "Şube ağını ve lokasyon bilgilerini yönetin", self.btn_sube))
-        self.btn_hareket.clicked.connect(lambda: self.handle_nav_click(4, "🔄 Hareketler Yönetimi", "Seçili kargonun taşıma geçmişini listeleyin", self.btn_hareket))
+        # PERBAIKAN: Menghapus seluruh emoji dari teks navigasi
+        self.btn_anamenu.clicked.connect(lambda: self.handle_nav_click(0, "Ana Menü", "Sistem istatistikleri ve genel bakış", self.btn_anamenu))
+        self.btn_musteri.clicked.connect(lambda: self.handle_nav_click(1, "Müşteriler Yönetimi", "Sistemdeki tüm müşteri kayıtlarını yönetin", self.btn_musteri))
+        self.btn_gonderi.clicked.connect(lambda: self.handle_nav_click(2, "Kargo Gönderimi Yönetimi", "Tüm aktif kargo sevkiyatlarını yönetin", self.btn_gonderi))
+        self.btn_sube.clicked.connect(lambda: self.handle_nav_click(3, "Şubeler Yönetimi", "Şube ağını ve lokasyon bilgilerini yönetin", self.btn_sube))
+        self.btn_hareket.clicked.connect(lambda: self.handle_nav_click(4, "Hareketler Yönetimi", "Seçili kargonun taşıma geçmişini listeleyin", self.btn_hareket))
 
-        # Setup Awal (Jadikan Ana Menu sebagai halaman default)
+        # Setup Awal
         self.btn_anamenu.setChecked(True)
-        self.handle_nav_click(0, "🏠 Ana Menu", "Sistem istatistikleri ve genel bakış", self.btn_anamenu, force_init=True)
+        self.handle_nav_click(0, "Ana Menü", "Sistem istatistikleri ve genel bakış", self.btn_anamenu, force_init=True)
 
   
     def handle_nav_click(self, index, title, subtitle, clicked_btn, force_init=False):

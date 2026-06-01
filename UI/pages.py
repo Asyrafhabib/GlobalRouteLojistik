@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QMessageBox, QHeaderView, QFrame, QDialog, QFormLayout, QLabel, QGridLayout)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QPointF
+from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QBrush, QFont, QLinearGradient
 from UI.icons import get_icon
 from BLL import kargo_logic
 
@@ -17,40 +18,197 @@ QPushButton#btn_kaydet { background-color: #007ACC; color: #FFFFFF; border: none
 QPushButton#btn_kaydet:hover { background-color: #005A9E; }
 """
 
-class AnimatedBar(QWidget):
-    """Widget Kustom untuk Diagram Batang Beranimasi"""
-    def __init__(self, label, value, max_value, color):
+# ==============================================================================
+# WIDGET DIAGRAM KUSTOM (LINE CHART & DONUT CHART) - DARK ENTERPRISE THEME
+# ==============================================================================
+
+class LineChartWidget(QWidget):
+    """Diagram Garis (Line Chart) dengan Sumbu Y yang Diperjelas"""
+    def __init__(self, data, labels):
         super().__init__()
-        self.layout = QVBoxLayout(self)
-        self.layout.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.data = data
+        self.labels = labels
+        self.progress = 0.0
+        self.setMinimumHeight(240)
         
-        self.val_label = QLabel(str(value))
-        self.val_label.setStyleSheet("color: #E0E0E0; font-weight: bold; font-size: 12px;")
-        self.val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.bar = QFrame()
-        self.bar.setStyleSheet(f"background-color: {color}; border-radius: 4px;")
-        self.bar.setFixedWidth(35)
-        self.bar.setFixedHeight(0)
-        
-        self.name_label = QLabel(label)
-        self.name_label.setStyleSheet("color: #858585; font-size: 11px; font-weight: bold;")
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.layout.addWidget(self.val_label)
-        self.layout.addWidget(self.bar, alignment=Qt.AlignmentFlag.AlignHCenter)
-        self.layout.addWidget(self.name_label)
-        
-        self.target_height = int((value / max_value) * 150) if max_value > 0 else 10
-        self.anim = QPropertyAnimation(self.bar, b"minimumHeight")
-        self.anim.setDuration(1200)
-        self.anim.setStartValue(0)
-        self.anim.setEndValue(self.target_height)
-        self.anim.setEasingCurve(QEasingCurve.Type.OutBounce)
+        self.anim = QVariantAnimation(self)
+        self.anim.setDuration(1500)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.anim.valueChanged.connect(self.update_progress)
+
+    def update_progress(self, val):
+        self.progress = val
+        self.update()
 
     def start_animation(self):
         self.anim.start()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        w, h = self.width(), self.height()
+        margin_left = 50 # Diperlebar untuk angka Sumbu Y
+        margin_right = 30
+        margin_y = 30
+        
+        draw_w = w - margin_left - margin_right
+        draw_h = h - (margin_y * 2)
+        
+        max_val = max(self.data) if self.data else 10
+        max_val = int(max_val + (max_val * 0.2)) # Tambah ruang 20% di atas
+        if max_val == 0: max_val = 10
+        
+        # Gambar Garis Latar (Grid) dan Angka Sumbu Y
+        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        for i in range(4):
+            y = margin_y + (draw_h / 3) * i
+            val_y = int(max_val - (max_val / 3) * i)
+            
+            # Teks Sumbu Y
+            painter.setPen(QColor(133, 133, 133))
+            painter.drawText(10, int(y + 5), f"{val_y}")
+            
+            # Garis Putus-putus
+            painter.setPen(QPen(QColor(62, 62, 66), 1, Qt.PenStyle.DashLine))
+            painter.drawLine(margin_left, int(y), w - margin_right, int(y))
+            
+        # Hitung Titik Koordinat
+        points = []
+        step_x = draw_w / (len(self.data) - 1) if len(self.data) > 1 else draw_w
+        for i, val in enumerate(self.data):
+            x = margin_left + (i * step_x)
+            y = margin_y + draw_h - ((val / max_val) * draw_h)
+            points.append(QPointF(x, y))
+            
+        # Efek Animasi
+        clip_rect = QRectF(0, 0, w * self.progress, h)
+        painter.setClipRect(clip_rect)
+
+        # Gambar Area Bawah Gradient
+        if len(points) > 1:
+            path = QPainterPath()
+            path.moveTo(points[0].x(), margin_y + draw_h)
+            for p in points: path.lineTo(p)
+            path.lineTo(points[-1].x(), margin_y + draw_h)
+            path.closeSubpath()
+            
+            grad = QLinearGradient(0, margin_y, 0, margin_y + draw_h)
+            grad.setColorAt(0.0, QColor(0, 122, 204, 120)) # Biru korporat transparan
+            grad.setColorAt(1.0, QColor(0, 122, 204, 0))
+            painter.fillPath(path, QBrush(grad))
+            
+            # Gambar Garis Utama
+            line_path = QPainterPath()
+            line_path.moveTo(points[0])
+            for p in points[1:]: line_path.lineTo(p)
+            
+            painter.setPen(QPen(QColor(0, 122, 204), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            painter.drawPath(line_path)
+
+        # Gambar Titik dan Sumbu X
+        painter.setClipRect(QRectF(0, 0, w, h)) 
+        for i, p in enumerate(points):
+            if p.x() <= w * self.progress: 
+                # Lingkaran Titik (Lebih Besar & Jelas)
+                painter.setPen(QPen(QColor(0, 122, 204), 2))
+                painter.setBrush(QBrush(QColor(30, 30, 30)))
+                painter.drawEllipse(p, 6, 6)
+                
+                # Angka di atas titik
+                painter.setPen(QColor(255, 255, 255))
+                painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+                painter.drawText(int(p.x() - 8), int(p.y() - 15), str(self.data[i]))
+            
+            # Label Hari (Sumbu X)
+            painter.setPen(QColor(166, 166, 166))
+            painter.setFont(QFont("Segoe UI", 10))
+            painter.drawText(int(p.x() - 10), int(margin_y + draw_h + 22), self.labels[i])
+
+
+class DonutChartWidget(QWidget):
+    """Diagram Donat Kategori Umum Sesuai Tema (Blue/Grey)"""
+    def __init__(self, data_dict):
+        super().__init__()
+        self.data = data_dict
+        self.progress = 0.0
+        self.setMinimumHeight(240)
+        
+        # Palet Warna Sesuai UI (Biru Terang, Biru Gelap, Abu-abu UI)
+        self.color_map = {
+            "Teslim Edildi": QColor(0, 122, 204),   # Accent Blue
+            "Yolda": QColor(0, 90, 158),            # Dark Blue
+            "Beklemede": QColor(62, 62, 66),        # Dark Grey
+            "Veri Yok": QColor(43, 43, 43)
+        }
+        
+        self.anim = QVariantAnimation(self)
+        self.anim.setDuration(1500)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.anim.valueChanged.connect(self.update_progress)
+
+    def update_progress(self, val):
+        self.progress = val
+        self.update()
+
+    def start_animation(self):
+        self.anim.start()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        w, h = self.width(), self.height()
+        size = min(w, h) - 40
+        rect = QRectF(20, (h - size) / 2, size, size)
+        
+        total = sum(self.data.values()) if self.data else 1
+        start_angle = 90 * 16 
+        
+        for label, val in self.data.items():
+            span_angle = int((-val / total) * 360 * 16 * self.progress)
+            color = self.color_map.get(label, QColor(0, 122, 204))
+            
+            painter.setBrush(QBrush(color))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawPie(rect, start_angle, span_angle)
+            start_angle += span_angle
+            
+        # Lubang Tengah
+        hole_size = size * 0.65
+        hole_rect = QRectF(20 + (size - hole_size)/2, (h - hole_size)/2, hole_size, hole_size)
+        painter.setBrush(QBrush(QColor(24, 24, 24))) 
+        painter.drawEllipse(hole_rect)
+        
+        # Teks Total
+        if self.progress > 0.5:
+            painter.setPen(QColor(255, 255, 255))
+            painter.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+            painter.drawText(hole_rect, Qt.AlignmentFlag.AlignCenter, f"{int(total * self.progress)}\nKargo")
+
+        # Legenda yang Diperjelas
+        legend_x = 20 + size + 40
+        legend_y = (h - (len(self.data) * 35)) / 2
+        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        
+        for i, (label, val) in enumerate(self.data.items()):
+            color = self.color_map.get(label, QColor(0, 122, 204))
+            y_pos = int(legend_y + (i * 35))
+            
+            painter.setBrush(QBrush(color))
+            painter.drawRect(int(legend_x), y_pos, 14, 14)
+            
+            painter.setPen(QColor(224, 224, 224))
+            pct = int((val/total)*100) if total > 0 else 0
+            painter.drawText(int(legend_x + 25), y_pos + 12, f"{label} (%{pct})")
+
+# ==============================================================================
+# HALAMAN-HALAMAN (PAGES)
+# ==============================================================================
 
 class BasePage(QWidget):
     def __init__(self):
@@ -63,53 +221,77 @@ class BasePage(QWidget):
         self.card_layout.setContentsMargins(20, 20, 20, 20)
         self.layout.addWidget(self.card)
 
-# --- 0. ANA MENU (DASHBOARD) PAGE ---
+# --- 0. ANA MENÜ (DASHBOARD) PAGE ---
 class AnaMenuPage(BasePage):
     def __init__(self):
         super().__init__()
-        lbl_title = QLabel("📊 Sistem Gösterge Paneli")
+        lbl_title = QLabel("Sistem Gösterge Paneli")
         lbl_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px; background-color: transparent;")
         self.card_layout.addWidget(lbl_title)
         
         grid = QGridLayout()
         grid.setSpacing(15)
 
-        self.card_musteri, self.lbl_val_musteri = self.create_stat_card("Toplam Müşteri", "0", "#007ACC")
-        self.card_kargo, self.lbl_val_kargo = self.create_stat_card("Aktif Gönderiler", "0", "#D32F2F")
-        self.card_sube, self.lbl_val_sube = self.create_stat_card("Kayıtlı Şubeler", "0", "#2E7D32")
-        self.card_status, self.lbl_val_status = self.create_stat_card("Sistem Durumu", "Çevrimiçi", "#F57C00")
+        self.card_musteri, self.lbl_val_musteri = self.create_stat_card("Toplam Müşteri", "0")
+        self.card_kargo, self.lbl_val_kargo = self.create_stat_card("Aktif Gönderiler", "0")
+        self.card_sube, self.lbl_val_sube = self.create_stat_card("Kayıtlı Şubeler", "0")
+        self.card_status, self.lbl_val_status = self.create_stat_card("Sistem Durumu", "Çevrimiçi")
 
         grid.addWidget(self.card_musteri, 0, 0); grid.addWidget(self.card_kargo, 0, 1)
         grid.addWidget(self.card_sube, 0, 2); grid.addWidget(self.card_status, 0, 3)
         self.card_layout.addLayout(grid)
         
-        chart_title = QLabel("📈 Son 5 Günlük Kargo Hacmi")
-        chart_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #CCCCCC; margin-top: 30px; margin-bottom: 10px; background-color: transparent;")
-        self.card_layout.addWidget(chart_title)
-        
-        self.chart_frame = QFrame()
-        self.chart_frame.setStyleSheet("background-color: #181818; border: 1px solid #2B2B2B; border-radius: 8px;")
-        self.chart_layout = QHBoxLayout(self.chart_frame)
-        self.chart_layout.setContentsMargins(20, 30, 20, 15)
-        self.chart_layout.setSpacing(40)
-        self.chart_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Animasi Data Chart 
-        data = [("Pzt", 12), ("Sal", 28), ("Çar", 15), ("Per", 35), ("Cum", 22)]
-        max_val = 35
-        self.bars = []
-        for day, val in data:
-            bar = AnimatedBar(day, val, max_val, "#007ACC")
-            self.chart_layout.addWidget(bar)
-            self.bars.append(bar)
-            
-        self.card_layout.addWidget(self.chart_frame)
+        charts_layout = QHBoxLayout()
+        charts_layout.setSpacing(20)
+        charts_layout.setContentsMargins(0, 20, 0, 0)
+
+        # 1. Bingkai Diagram Garis
+        frame_line = QFrame()
+        frame_line.setStyleSheet("QFrame { background-color: #181818; border: 1px solid #2B2B2B; border-radius: 10px; }")
+        lay_line = QVBoxLayout(frame_line)
+        lbl_line = QLabel("Son 5 Günlük Kargo Hacmi"); lbl_line.setStyleSheet("color: #E0E0E0; font-size: 15px; font-weight: bold; padding: 10px 5px 0px 10px;")
+        self.chart_line = LineChartWidget(data=[12, 28, 15, 35, 22], labels=["Pzt", "Sal", "Çar", "Per", "Cum"])
+        lay_line.addWidget(lbl_line); lay_line.addWidget(self.chart_line)
+        charts_layout.addWidget(frame_line, stretch=3) 
+
+        # 2. Bingkai Diagram Donat
+        status_data = self.get_kargo_status_distribution()
+        frame_donut = QFrame()
+        frame_donut.setStyleSheet("QFrame { background-color: #181818; border: 1px solid #2B2B2B; border-radius: 10px; }")
+        lay_donut = QVBoxLayout(frame_donut)
+        lbl_donut = QLabel("Kargo Durum Dağılımı"); lbl_donut.setStyleSheet("color: #E0E0E0; font-size: 15px; font-weight: bold; padding: 10px 5px 0px 10px;")
+        self.chart_donut = DonutChartWidget(data_dict=status_data)
+        lay_donut.addWidget(lbl_donut); lay_donut.addWidget(self.chart_donut)
+        charts_layout.addWidget(frame_donut, stretch=2) 
+
+        self.card_layout.addLayout(charts_layout)
         self.card_layout.addStretch()
         self.load_analytics_data()
 
-    def create_stat_card(self, title, value, color_accent):
+    def get_kargo_status_distribution(self):
+        """Mengkategorikan status secara pintar menjadi 3 grup besar"""
+        b, v = kargo_logic.gonderi_getir_bll()
+        dist = {"Teslim Edildi": 0, "Yolda": 0, "Beklemede": 0}
+        
+        if b:
+            for row in v:
+                status = str(row[6]).strip().lower()
+                # Kategorisasi Logika
+                if "teslim edildi" in status:
+                    dist["Teslim Edildi"] += 1
+                elif "beklemede" in status or "bekliyor" in status:
+                    dist["Beklemede"] += 1
+                else:
+                    dist["Yolda"] += 1
+                    
+        # Hapus kategori yang nilainya 0 agar diagram bersih
+        clean_dist = {k: v for k, v in dist.items() if v > 0}
+        return clean_dist if clean_dist else {"Veri Yok": 1}
+
+    def create_stat_card(self, title, value):
+        # Aksen warna diseragamkan dengan warna biru UI (Bukan warna-warni lagi)
         card = QFrame()
-        card.setStyleSheet(f"QFrame {{ background-color: #181818; border: 1px solid #2B2B2B; border-radius: 10px; border-bottom: 4px solid {color_accent}; }}")
+        card.setStyleSheet("QFrame { background-color: #181818; border: 1px solid #2B2B2B; border-radius: 10px; border-bottom: 4px solid #007ACC; }")
         lay = QVBoxLayout(card)
         lay.setContentsMargins(20, 20, 20, 20)
         lbl_t = QLabel(title); lbl_t.setStyleSheet("color: #858585; font-size: 14px; font-weight: 700; border: none;")
@@ -127,7 +309,8 @@ class AnaMenuPage(BasePage):
 
     def showEvent(self, event):
         super().showEvent(event)
-        for bar in self.bars: bar.start_animation()
+        self.chart_line.start_animation()
+        self.chart_donut.start_animation()
 
 # --- 1. MÜŞTERİ PAGE ---
 class MusteriPage(BasePage):
@@ -147,7 +330,7 @@ class MusteriPage(BasePage):
         self.dialog.setFixedSize(450, 460); self.dialog.setStyleSheet(MODAL_STYLE)
         dialog_layout = QVBoxLayout(self.dialog); dialog_layout.setContentsMargins(30, 30, 30, 30); dialog_layout.setSpacing(15)
 
-        title_label = QLabel("👥 Müşteri Detayları"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
+        title_label = QLabel("Müşteri Detayları"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
         dialog_layout.addWidget(title_label)
 
         self.txt_id = QLineEdit(); self.txt_ad = QLineEdit(); self.txt_soyad = QLineEdit()
@@ -167,7 +350,6 @@ class MusteriPage(BasePage):
         self.tablo = QTableWidget(); self.tablo.setColumnCount(7) 
         self.tablo.setHorizontalHeaderLabels(["No.", "ID", "Müşteri Adı", "Soyad", "Telefon", "Mail", "Ülke"])
         
-        # PERBAIKAN: Resize tabel agar panjang otomatis dan tidak terpotong
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.horizontalHeader().setStretchLastSection(True)
         
@@ -233,7 +415,7 @@ class GonderiPage(BasePage):
         self.dialog.setFixedSize(450, 480); self.dialog.setStyleSheet(MODAL_STYLE)
         dialog_layout = QVBoxLayout(self.dialog); dialog_layout.setContentsMargins(30, 30, 30, 30); dialog_layout.setSpacing(15)
 
-        title_label = QLabel("📦 Kargo Formu"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
+        title_label = QLabel("Kargo Formu"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
         dialog_layout.addWidget(title_label)
 
         self.txt_id = QLineEdit(); self.txt_mid = QLineEdit()
@@ -255,7 +437,6 @@ class GonderiPage(BasePage):
         self.tablo = QTableWidget(); self.tablo.setColumnCount(9) 
         self.tablo.setHorizontalHeaderLabels(["No.", "Kargo ID", "Müşteri", "Çıkış Şubesi", "Varış Adresi", "Ağırlık (kg)", "Ücret (₺)", "Durum", "Tarih"])
         
-        # PERBAIKAN: Resize tabel agar panjang otomatis dan tidak terpotong
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.horizontalHeader().setStretchLastSection(True)
         
@@ -323,7 +504,7 @@ class SubePage(BasePage):
         self.dialog.setFixedSize(450, 360); self.dialog.setStyleSheet(MODAL_STYLE)
         dialog_layout = QVBoxLayout(self.dialog); dialog_layout.setContentsMargins(30, 30, 30, 30); dialog_layout.setSpacing(15)
 
-        title_label = QLabel("🏢 Şube Detayları"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
+        title_label = QLabel("Şube Detayları"); title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
         dialog_layout.addWidget(title_label)
 
         self.txt_id = QLineEdit(); self.txt_ad = QLineEdit()
@@ -343,7 +524,6 @@ class SubePage(BasePage):
         self.tablo = QTableWidget(); self.tablo.setColumnCount(5) 
         self.tablo.setHorizontalHeaderLabels(["No.", "Şube ID", "Şube Adı", "Ülke", "Şehir"])
         
-        # PERBAIKAN: Resize tabel agar panjang otomatis dan tidak terpotong
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.horizontalHeader().setStretchLastSection(True)
         
@@ -398,14 +578,14 @@ class HareketPage(BasePage):
         super().__init__()
         toolbar = QHBoxLayout()
         
-        # PERBAIKAN HAREKET: Menggunakan Input Manual untuk ID
         self.txt_gid_sorgu = QLineEdit()
         self.txt_gid_sorgu.setPlaceholderText("Gönderi ID Girin (Örn: TRK-001)")
         self.txt_gid_sorgu.setFixedWidth(250)
         toolbar.addWidget(self.txt_gid_sorgu)
         
-        self.btn_sorgula = QPushButton(" 🔍 Sorgula")
+        self.btn_sorgula = QPushButton(" Sorgula")
         self.btn_sorgula.setObjectName("btn_sorgula")
+        self.btn_sorgula.setIcon(get_icon("search"))
         toolbar.addWidget(self.btn_sorgula)
         
         self.btn_yeni = QPushButton(" Yeni Ekle"); self.btn_yeni.setIcon(get_icon("add"))
@@ -418,7 +598,7 @@ class HareketPage(BasePage):
         self.dialog.setFixedSize(450, 360); self.dialog.setStyleSheet(MODAL_STYLE)
         dialog_layout = QVBoxLayout(self.dialog); dialog_layout.setContentsMargins(30, 30, 30, 30); dialog_layout.setSpacing(15)
 
-        title_label = QLabel("🔄 Yeni Hareket Ekle")
+        title_label = QLabel("Yeni Hareket Ekle")
         title_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 10px;")
         dialog_layout.addWidget(title_label)
 
@@ -441,7 +621,6 @@ class HareketPage(BasePage):
         self.tablo = QTableWidget(); self.tablo.setColumnCount(4)
         self.tablo.setHorizontalHeaderLabels(["No.", "İşlem Tarihi", "Şube Adı", "Durum"])
         
-        # PERBAIKAN: Resize tabel agar panjang otomatis dan tidak terpotong
         self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.tablo.horizontalHeader().setStretchLastSection(True)
         
@@ -451,7 +630,7 @@ class HareketPage(BasePage):
         self.card_layout.addWidget(self.tablo)
 
         self.btn_sorgula.clicked.connect(self.ara)
-        self.txt_gid_sorgu.returnPressed.connect(self.ara) # Fitur Ekstra: Enter untuk mencari!
+        self.txt_gid_sorgu.returnPressed.connect(self.ara) 
         self.btn_yeni.clicked.connect(self.goster_form)
         self.btn_iptal.clicked.connect(self.dialog.reject)
         self.btn_kaydet.clicked.connect(self.kaydet)
@@ -461,7 +640,7 @@ class HareketPage(BasePage):
         g_id = self.txt_gid_sorgu.text().strip()
         if not g_id: return QMessageBox.warning(self, "Uyarı", "Lütfen önce arama kutusuna bir Gönderi ID yazın!")
         self.txt_gid.setText(g_id)
-        self.txt_gid.setEnabled(False) # Kunci input agar tidak salah isi
+        self.txt_gid.setEnabled(False) 
         self.dialog.exec()
 
     def ara(self):
