@@ -589,7 +589,12 @@ class HareketPage(BasePage):
         toolbar.addWidget(self.btn_sorgula)
         
         self.btn_yeni = QPushButton(" Yeni Ekle"); self.btn_yeni.setIcon(get_icon("add"))
+        
+        # TOMBOL SIL DITAMBAHKAN KEMBALI
+        self.btn_sil = QPushButton(" Sil"); self.btn_sil.setIcon(get_icon("delete")); self.btn_sil.setObjectName("btn_sil")
+        
         toolbar.addWidget(self.btn_yeni)
+        toolbar.addWidget(self.btn_sil)
         toolbar.addStretch()
         self.card_layout.addLayout(toolbar)
 
@@ -618,11 +623,15 @@ class HareketPage(BasePage):
         btn_layout.addStretch(); btn_layout.addWidget(self.btn_iptal); btn_layout.addWidget(self.btn_kaydet)
         dialog_layout.addLayout(btn_layout)
 
-        self.tablo = QTableWidget(); self.tablo.setColumnCount(4)
-        self.tablo.setHorizontalHeaderLabels(["No.", "İşlem Tarihi", "Şube Adı", "Durum"])
+        # TABEL DIUBAH MENJADI 5 KOLOM
+        self.tablo = QTableWidget(); self.tablo.setColumnCount(5)
+        self.tablo.setHorizontalHeaderLabels(["No.", "Hareket ID", "İşlem Tarihi", "Şube Adı", "Durum"])
         
-        self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.tablo.horizontalHeader().setStretchLastSection(True)
+        # MENYEMBUNYIKAN KOLOM "Hareket ID" AGAR DESAIN TETAP RAPI
+        self.tablo.setColumnHidden(1, True)
+        
+        self.tablo.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tablo.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         
         self.tablo.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tablo.verticalHeader().setVisible(False)
@@ -632,8 +641,71 @@ class HareketPage(BasePage):
         self.btn_sorgula.clicked.connect(self.ara)
         self.txt_gid_sorgu.returnPressed.connect(self.ara) 
         self.btn_yeni.clicked.connect(self.goster_form)
+        self.btn_sil.clicked.connect(self.sil) # EVENT SIL
         self.btn_iptal.clicked.connect(self.dialog.reject)
         self.btn_kaydet.clicked.connect(self.kaydet)
+
+    def goster_form(self):
+        for w in [self.txt_id, self.txt_sid, self.txt_durum]: w.clear()
+        g_id = self.txt_gid_sorgu.text().strip()
+        if not g_id: return QMessageBox.warning(self, "Uyarı", "Lütfen önce arama kutusuna bir Gönderi ID yazın!")
+        self.txt_gid.setText(g_id)
+        self.txt_gid.setEnabled(False) 
+        self.dialog.exec()
+
+    def ara(self):
+        g_id = self.txt_gid_sorgu.text().strip()
+        if not g_id: 
+            self.tablo.setRowCount(0)
+            return QMessageBox.warning(self, "Uyarı", "Lütfen bir Gönderi ID girin!")
+            
+        b, v = kargo_logic.hareket_getir_bll(g_id)
+        if b:
+            self.tablo.setRowCount(0)
+            if len(v) == 0:
+                QMessageBox.information(self, "Bilgi", "Bu Gönderi ID'sine ait bir hareket bulunamadı.")
+                return
+                
+            for i, row in enumerate(v):
+                self.tablo.insertRow(i)
+                item_no = QTableWidgetItem(str(i + 1)); item_no.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tablo.setItem(i, 0, item_no)
+                
+                # Memasukkan data dari DB ke kolom 1 (Hareket ID), 2 (Tarih), 3 (Sube), 4 (Durum)
+                for j, val in enumerate(row): 
+                    self.tablo.setItem(i, j + 1, QTableWidgetItem(str(val)))
+        else: 
+            self.tablo.setRowCount(0)
+
+    def kaydet(self):
+        b, m = kargo_logic.hareket_kaydet_bll(self.txt_id.text(), self.txt_gid.text(), self.txt_sid.text(), self.txt_durum.text())
+        if b: QMessageBox.information(self, "Başarılı", m); self.dialog.accept(); self.ara()
+        else: QMessageBox.warning(self, "Hata", m)
+
+    def sil(self):
+        # 1. Cek apakah ada baris yang dipilih (Diklik)
+        s = self.tablo.currentRow()
+        if s < 0: 
+            return QMessageBox.warning(self, "Uyarı", "Lütfen silmek istediğiniz kargo hareketini tablodan seçin!")
+        
+        # 2. Ambil ID dari kolom index ke-1 yang disembunyikan
+        hareket_id = self.tablo.item(s, 1).text()
+        
+        # 3. Detektor Error (Jika Python belum di-restart dan tidak sengaja menangkap Tanggal)
+        if "-" in hareket_id and ":" in hareket_id and len(hareket_id) > 10:
+            return QMessageBox.critical(self, "Hata", "Sistem Hareket ID'yi bulamadı (Tarih verisi yakalandı)!\nLütfen Python uygulamasını tamamen kapatıp yeniden çalıştırın.")
+        
+        # 4. Konfirmasi Penghapusan dengan menyebutkan ID-nya
+        cevap = QMessageBox.question(self, "Onay", f"Seçili kargo hareketini ({hareket_id}) silmek istediğinize emin misiniz?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        
+        if cevap == QMessageBox.StandardButton.Yes:
+            # Memanggil fungsi Hapus di BLL
+            basarili, mesaj = kargo_logic.hareket_sil_bll(hareket_id)
+            if basarili:
+                QMessageBox.information(self, "Başarılı", "Kargo hareketi başarıyla silindi!")
+                self.ara() # Segarkan tabel setelah dihapus
+            else:
+                QMessageBox.warning(self, "Hata", f"Silinirken bir hata oluştu:\n{mesaj}")
 
     def goster_form(self):
         for w in [self.txt_id, self.txt_sid, self.txt_durum]: w.clear()
