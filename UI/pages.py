@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                              QMessageBox, QHeaderView, QFrame, QDialog, QFormLayout, QLabel, QGridLayout)
 from PyQt6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QPointF
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QBrush, QFont, QLinearGradient
+from datetime import datetime
 from UI.icons import get_icon
 from BLL import kargo_logic
 
@@ -665,6 +666,11 @@ class HareketPage(BasePage):
             if len(v) == 0:
                 QMessageBox.information(self, "Bilgi", "Bu Gönderi ID'sine ait bir hareket bulunamadı.")
                 return
+
+            try:
+                v = sorted(v, key=lambda row: datetime.strptime(str(row[1]), "%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                v = list(v)
                 
             for i, row in enumerate(v):
                 self.tablo.insertRow(i)
@@ -706,38 +712,3 @@ class HareketPage(BasePage):
                 self.ara() # Segarkan tabel setelah dihapus
             else:
                 QMessageBox.warning(self, "Hata", f"Silinirken bir hata oluştu:\n{mesaj}")
-
-    def goster_form(self):
-        for w in [self.txt_id, self.txt_sid, self.txt_durum]: w.clear()
-        g_id = self.txt_gid_sorgu.text().strip()
-        if not g_id: return QMessageBox.warning(self, "Uyarı", "Lütfen önce arama kutusuna bir Gönderi ID yazın!")
-        self.txt_gid.setText(g_id)
-        self.txt_gid.setEnabled(False) 
-        self.dialog.exec()
-
-    def ara(self):
-        g_id = self.txt_gid_sorgu.text().strip()
-        if not g_id: 
-            self.tablo.setRowCount(0)
-            return QMessageBox.warning(self, "Uyarı", "Lütfen bir Gönderi ID girin!")
-            
-        b, v = kargo_logic.hareket_getir_bll(g_id)
-        if b:
-            self.tablo.setRowCount(0)
-            if len(v) == 0:
-                QMessageBox.information(self, "Bilgi", "Bu Gönderi ID'sine ait bir hareket bulunamadı.")
-                return
-                
-            for i, row in enumerate(v):
-                self.tablo.insertRow(i)
-                item_no = QTableWidgetItem(str(i + 1)); item_no.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tablo.setItem(i, 0, item_no)
-                for j, val in enumerate(row): 
-                    self.tablo.setItem(i, j + 1, QTableWidgetItem(str(val)))
-        else: 
-            self.tablo.setRowCount(0)
-
-    def kaydet(self):
-        b, m = kargo_logic.hareket_kaydet_bll(self.txt_id.text(), self.txt_gid.text(), self.txt_sid.text(), self.txt_durum.text())
-        if b: QMessageBox.information(self, "Başarılı", m); self.dialog.accept(); self.ara()
-        else: QMessageBox.warning(self, "Hata", m)
